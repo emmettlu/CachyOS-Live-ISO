@@ -1,0 +1,347 @@
+#!/usr/bin/bash
+
+set -euo pipefail
+
+root_prefix=${AGENTOS_CALAMARES_ROOT:-}
+root_prefix=${root_prefix%/}
+
+root_path() {
+    printf '%s%s' "${root_prefix}" "$1"
+}
+
+line_count() {
+    grep -Fxc -- "$2" "$1" || true
+}
+
+fail_state() {
+    printf '%s: incompatible Calamares configuration near: %s\n' \
+        "$1" "$2" >&2
+    exit 1
+}
+
+ensure_replacement() {
+    local path=$1
+    local original=$2
+    local replacement=$3
+    local expression=$4
+    local original_count replacement_count
+
+    original_count=$(line_count "${path}" "${original}")
+    replacement_count=$(line_count "${path}" "${replacement}")
+
+    if [[ ${original_count} -eq 1 && ${replacement_count} -eq 0 ]]; then
+        sed -i -- "${expression}" "${path}"
+    elif [[ ${original_count} -ne 0 || ${replacement_count} -ne 1 ]]; then
+        fail_state "${path}" "${original}"
+    fi
+
+    if [[ $(line_count "${path}" "${original}") -ne 0 || \
+        $(line_count "${path}" "${replacement}") -ne 1 ]]; then
+        fail_state "${path}" "${replacement}"
+    fi
+}
+
+ensure_removal() {
+    local path=$1
+    local original=$2
+    local expression=$3
+    local original_count
+
+    original_count=$(line_count "${path}" "${original}")
+    if [[ ${original_count} -eq 1 ]]; then
+        sed -i -- "${expression}" "${path}"
+    elif [[ ${original_count} -ne 0 ]]; then
+        fail_state "${path}" "${original}"
+    fi
+
+    if [[ $(line_count "${path}" "${original}") -ne 0 ]]; then
+        fail_state "${path}" "${original}"
+    fi
+}
+
+ensure_agentos_install_files() {
+    local path=$1
+    local anchor='  - "/usr/local/bin/remove-nvidia"'
+    local installer='  - "/usr/local/bin/agentos-install-package"'
+    local package='  - "/opt/agentos/agentos.pkg.tar.zst"'
+    local anchor_count installer_count package_count
+
+    anchor_count=$(line_count "${path}" "${anchor}")
+    installer_count=$(line_count "${path}" "${installer}")
+    package_count=$(line_count "${path}" "${package}")
+
+    if [[ ${anchor_count} -ne 1 ]]; then
+        fail_state "${path}" "${anchor}"
+    fi
+
+    if [[ ${installer_count} -eq 0 && ${package_count} -eq 0 ]]; then
+        sed -i '\|^  - "/usr/local/bin/remove-nvidia"$|a\
+  - "/usr/local/bin/agentos-install-package"\
+  - "/opt/agentos/agentos.pkg.tar.zst"' "${path}"
+    elif [[ ${installer_count} -ne 1 || ${package_count} -ne 1 ]]; then
+        fail_state "${path}" "${installer}"
+    fi
+}
+
+ensure_agentos_install_command() {
+    local path=$1
+    local anchor='    - "-rm /usr/local/bin/agentos-bootloader-post-setup"'
+    local installer='    - command: "/usr/local/bin/agentos-install-package ${USER}"'
+    local cleanup='    - "-rm /usr/local/bin/agentos-install-package"'
+    local anchor_count installer_count cleanup_count
+
+    anchor_count=$(line_count "${path}" "${anchor}")
+    installer_count=$(line_count "${path}" "${installer}")
+    cleanup_count=$(line_count "${path}" "${cleanup}")
+
+    if [[ ${anchor_count} -ne 1 ]]; then
+        fail_state "${path}" "${anchor}"
+    fi
+
+    if [[ ${installer_count} -eq 0 && ${cleanup_count} -eq 0 ]]; then
+        sed -i '\|^    - "-rm /usr/local/bin/agentos-bootloader-post-setup"$|a\
+    - command: "/usr/local/bin/agentos-install-package ${USER}"\
+    - "-rm /usr/local/bin/agentos-install-package"' "${path}"
+    elif [[ ${installer_count} -ne 1 || ${cleanup_count} -ne 1 ]]; then
+        fail_state "${path}" "${installer}"
+    fi
+}
+
+ensure_finalizer_commands() {
+    local path=$1
+
+    ensure_replacement \
+        "${path}" \
+        '    - command: "/etc/calamares/scripts/dmcheck"' \
+        '    - command: "/usr/local/bin/dmcheck"' \
+        's|^    - command: "/etc/calamares/scripts/dmcheck"$|    - command: "/usr/local/bin/dmcheck"|'
+    ensure_replacement \
+        "${path}" \
+        '    - command: "/etc/calamares/scripts/shell-setup ${USER}"' \
+        '    - command: "/usr/local/bin/agentos-shell-setup ${USER}"' \
+        's|^    - command: "/etc/calamares/scripts/shell-setup ${USER}"$|    - command: "/usr/local/bin/agentos-shell-setup ${USER}"|'
+    ensure_replacement \
+        "${path}" \
+        "    - '-rm /etc/calamares/scripts/shell-setup'" \
+        "    - '-rm /usr/local/bin/agentos-shell-setup'" \
+        "s|^    - '-rm /etc/calamares/scripts/shell-setup'$|    - '-rm /usr/local/bin/agentos-shell-setup'|"
+    ensure_replacement \
+        "${path}" \
+        '    - command: "/etc/calamares/scripts/bootloader-post-setup"' \
+        '    - command: "/usr/local/bin/agentos-bootloader-post-setup"' \
+        's|^    - command: "/etc/calamares/scripts/bootloader-post-setup"$|    - command: "/usr/local/bin/agentos-bootloader-post-setup"|'
+    ensure_replacement \
+        "${path}" \
+        '    - "-rm /etc/calamares/scripts/bootloader-post-setup"' \
+        '    - "-rm /usr/local/bin/agentos-bootloader-post-setup"' \
+        's|^    - "-rm /etc/calamares/scripts/bootloader-post-setup"$|    - "-rm /usr/local/bin/agentos-bootloader-post-setup"|'
+}
+
+ensure_offline_kernel_step() {
+    local path=$1
+    local instance_anchor='- id:       offline'
+    local instance='- id:       agentos_offline_kernels'
+    local sequence_anchor='  - initcpiocfg'
+    local sequence='  - shellprocess@agentos_offline_kernels'
+    local instance_count sequence_count
+
+    instance_count=$(line_count "${path}" "${instance}")
+    sequence_count=$(line_count "${path}" "${sequence}")
+
+    if [[ ${instance_count} -eq 0 && ${sequence_count} -eq 0 ]]; then
+        if [[ $(line_count "${path}" "${instance_anchor}") -ne 1 ]]; then
+            fail_state "${path}" "${instance_anchor}"
+        fi
+        if [[ $(line_count "${path}" "${sequence_anchor}") -ne 1 ]]; then
+            fail_state "${path}" "${sequence_anchor}"
+        fi
+        sed -i '\|^- id:       offline$|i\
+- id:       agentos_offline_kernels\
+  module:   shellprocess\
+  config:   shellprocess_agentos_offline_kernels.conf\
+' "${path}"
+        sed -i '\|^  - initcpiocfg$|i\
+  - shellprocess@agentos_offline_kernels' "${path}"
+    elif [[ ${instance_count} -ne 1 || ${sequence_count} -ne 1 ]]; then
+        fail_state "${path}" "${instance}"
+    fi
+
+    if [[ $(line_count "${path}" "${instance}") -ne 1 || \
+        $(line_count "${path}" "${sequence}") -ne 1 ]]; then
+        fail_state "${path}" "${sequence}"
+    fi
+}
+
+ensure_offline_cleanup() {
+    local path=$1
+    local anchor='    - "-rm /usr/local/bin/agentos-install-package"'
+    local remove_package='    - "-pacman -Rsnc cachyos-calamares-next --noconfirm"'
+    local remove_configure='    - "-rm /usr/local/bin/agentos-configure-calamares"'
+    local remove_kernel_helper='    - "-rm /usr/local/bin/agentos-prepare-offline-kernels"'
+    local remove_launcher='    - "-rm /usr/local/bin/calamares-online.sh"'
+    local remove_data='    - "-rm -rf /etc/calamares /usr/share/calamares /usr/local/share/agentos-calamares"'
+    local anchor_count package_count configure_count kernel_helper_count launcher_count data_count
+
+    anchor_count=$(line_count "${path}" "${anchor}")
+    package_count=$(line_count "${path}" "${remove_package}")
+    configure_count=$(line_count "${path}" "${remove_configure}")
+    kernel_helper_count=$(line_count "${path}" "${remove_kernel_helper}")
+    launcher_count=$(line_count "${path}" "${remove_launcher}")
+    data_count=$(line_count "${path}" "${remove_data}")
+
+    if [[ ${anchor_count} -ne 1 ]]; then
+        fail_state "${path}" "${anchor}"
+    fi
+
+    if [[ ${package_count} -eq 1 && ${configure_count} -eq 1 && \
+        ${kernel_helper_count} -eq 0 && ${launcher_count} -eq 1 && \
+        ${data_count} -eq 1 ]]; then
+        sed -i '\|^    - "-rm /usr/local/bin/agentos-configure-calamares"$|a\
+    - "-rm /usr/local/bin/agentos-prepare-offline-kernels"' "${path}"
+    elif [[ ${package_count} -eq 0 && ${configure_count} -eq 0 && \
+        ${kernel_helper_count} -eq 0 && ${launcher_count} -eq 0 && \
+        ${data_count} -eq 0 ]]; then
+        sed -i '\|^    - "-rm /usr/local/bin/agentos-install-package"$|a\
+    - "-pacman -Rsnc cachyos-calamares-next --noconfirm"\
+    - "-rm /usr/local/bin/agentos-configure-calamares"\
+    - "-rm /usr/local/bin/agentos-prepare-offline-kernels"\
+    - "-rm /usr/local/bin/calamares-online.sh"\
+    - "-rm -rf /etc/calamares /usr/share/calamares /usr/local/share/agentos-calamares"' "${path}"
+    elif [[ ${package_count} -ne 1 || ${configure_count} -ne 1 || \
+        ${kernel_helper_count} -ne 1 || ${launcher_count} -ne 1 || \
+        ${data_count} -ne 1 ]]; then
+        fail_state "${path}" "${remove_package}"
+    fi
+}
+
+brand_status_text() {
+    local path=$1
+
+    [[ -f ${path} ]] || return 0
+    if grep -Fq -- 'CachyOS' "${path}"; then
+        sed -i 's/CachyOS/AgentOS/g' "${path}"
+    fi
+    if ! grep -Fq -- 'AgentOS' "${path}"; then
+        fail_state "${path}" 'AgentOS status text'
+    fi
+}
+
+modules_dir=$(root_path /etc/calamares/modules)
+branding_source=$(root_path /usr/local/share/agentos-calamares)
+branding_target=$(root_path /usr/share/calamares/branding/agentos)
+cachyos_branding=$(root_path /usr/share/calamares/branding/cachyos)
+agentos_logo=$(root_path /usr/share/icons/hicolor/512x512/apps/org.agentos.hello.png)
+shell_setup_source=$(root_path /etc/calamares/scripts/shell-setup)
+shell_setup_target=$(root_path /usr/local/bin/agentos-shell-setup)
+bootloader_post_source=$(root_path /etc/calamares/scripts/bootloader-post-setup)
+bootloader_post_target=$(root_path /usr/local/bin/agentos-bootloader-post-setup)
+dmcheck_source=$(root_path /usr/local/bin/dmcheck)
+
+pacstrap_conf=${modules_dir}/pacstrap.conf
+partition_conf=${modules_dir}/partition.conf
+shellprocess_conf=${modules_dir}/shellprocess.conf
+welcome_conf=${modules_dir}/welcome_online.conf
+bootloader_conf=${modules_dir}/bootloader.conf
+offline_settings=$(root_path /usr/share/calamares/settings_offline.conf)
+
+for path in \
+    "${pacstrap_conf}" \
+    "${partition_conf}" \
+    "${shellprocess_conf}" \
+    "${bootloader_conf}" \
+    "${offline_settings}" \
+    "${branding_source}/branding.desc" \
+    "${branding_source}/packagechooser_bootloader.conf" \
+    "${branding_source}/shellprocess_agentos_offline_kernels.conf" \
+    "${cachyos_branding}/calamares-sidebar.qml" \
+    "${agentos_logo}" \
+    "${shell_setup_source}" \
+    "${bootloader_post_source}" \
+    "${dmcheck_source}"; do
+    if [[ ! -f ${path} ]]; then
+        printf 'required AgentOS Calamares input is missing: %s\n' "${path}" >&2
+        exit 1
+    fi
+done
+
+ensure_agentos_install_files "${pacstrap_conf}"
+ensure_finalizer_commands "${shellprocess_conf}"
+ensure_agentos_install_command "${shellprocess_conf}"
+ensure_offline_cleanup "${shellprocess_conf}"
+install -m 0755 "${shell_setup_source}" "${shell_setup_target}"
+install -m 0755 "${bootloader_post_source}" "${bootloader_post_target}"
+install -m 0644 \
+    "${branding_source}/shellprocess_agentos_offline_kernels.conf" \
+    "${modules_dir}/shellprocess_agentos_offline_kernels.conf"
+ensure_offline_kernel_step "${offline_settings}"
+ensure_replacement \
+    "${partition_conf}" \
+    'availableFileSystemTypes:  ["btrfs","xfs","ext4","f2fs","zfs"]' \
+    'availableFileSystemTypes: [ "btrfs" ]' \
+    's/^availableFileSystemTypes:  \["btrfs","xfs","ext4","f2fs","zfs"\]$/availableFileSystemTypes: [ "btrfs" ]/'
+ensure_removal \
+    "${bootloader_conf}" \
+    'efiBootLoaderVar: "packagechooser_bootloader"' \
+    '/^efiBootLoaderVar: "packagechooser_bootloader"$/d'
+ensure_replacement \
+    "${bootloader_conf}" \
+    'efiBootLoader: "limine"' \
+    'efiBootLoader: "systemd-boot"' \
+    's/^efiBootLoader: "limine"$/efiBootLoader: "systemd-boot"/'
+ensure_replacement \
+    "${bootloader_conf}" \
+    'efiBootloaderId: "cachyos"' \
+    'efiBootloaderId: "agentos"' \
+    's/^efiBootloaderId: "cachyos"$/efiBootloaderId: "agentos"/'
+
+install -d -m 0755 "${modules_dir}" "${branding_target}"
+install -m 0644 \
+    "${branding_source}/packagechooser_bootloader.conf" \
+    "${modules_dir}/packagechooser_bootloader.conf"
+install -m 0644 \
+    "${branding_source}/branding.desc" \
+    "${branding_target}/branding.desc"
+install -m 0644 \
+    "${cachyos_branding}/calamares-sidebar.qml" \
+    "${branding_target}/calamares-sidebar.qml"
+install -m 0644 "${agentos_logo}" \
+    "${branding_target}/icon.png"
+install -m 0644 "${agentos_logo}" \
+    "${branding_target}/logo.png"
+install -m 0644 "${agentos_logo}" \
+    "${branding_target}/welcome.png"
+
+if [[ -f ${cachyos_branding}/stylesheet.qss ]]; then
+    install -m 0644 \
+        "${cachyos_branding}/stylesheet.qss" \
+        "${branding_target}/stylesheet.qss"
+fi
+
+settings_found=false
+for settings in \
+    "$(root_path /usr/share/calamares/settings_online.conf)" \
+    "$(root_path /usr/share/calamares/settings_offline.conf)"; do
+    [[ -f ${settings} ]] || continue
+    settings_found=true
+    ensure_replacement \
+        "${settings}" \
+        'branding: cachyos' \
+        'branding: agentos' \
+        's/^branding: cachyos$/branding: agentos/'
+done
+
+if [[ ${settings_found} != true ]]; then
+    printf 'no Calamares settings file found\n' >&2
+    exit 1
+fi
+
+if [[ -f ${welcome_conf} ]]; then
+    ensure_replacement \
+        "${welcome_conf}" \
+        '    internetCheckUrl:   https://wiki.cachyos.org' \
+        '    internetCheckUrl:   https://github.com/emmettlu/agentos' \
+        's|^    internetCheckUrl:   https://wiki\.cachyos\.org$|    internetCheckUrl:   https://github.com/emmettlu/agentos|'
+fi
+
+brand_status_text "${modules_dir}/shellprocess-before-online.conf"
+brand_status_text "${modules_dir}/shellprocess-before.conf"

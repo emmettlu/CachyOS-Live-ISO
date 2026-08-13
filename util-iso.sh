@@ -179,6 +179,7 @@ run_build() {
     msg2 "Copying the Archiso folder to build work"
     mkdir -p ${work_dir}
     cp -r archiso ${work_dir}/archiso
+    "${src_dir}/prepare-package-cache.sh" "${_profile}" "${work_dir}/archiso"
 
     msg "Start [Build ISO]"
 
@@ -191,7 +192,7 @@ run_build() {
     sudo chown $USER $outFolder
 
     cp ${work_dir}/iso/arch/pkglist.x86_64.txt "$outFolder/$_profile/$(gen_iso_fn).pkgs.txt"
-    mv "$outFolder/$_profile/cachyos-$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)-x86_64.iso" "$outFolder/$_profile/${iso_file}"
+    mv -f -- "$outFolder/$_profile/cachyos-$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)-x86_64.iso" "$outFolder/$_profile/${iso_file}"
 
     msg "Done [Build ISO] ${iso_file}"
     msg "Finished building [%s]" "${_profile}"

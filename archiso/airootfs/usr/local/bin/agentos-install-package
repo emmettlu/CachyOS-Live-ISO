@@ -1,0 +1,17 @@
+#!/usr/bin/bash
+
+set -euo pipefail
+
+if (($# != 1)); then
+  exit 2
+fi
+
+package=/opt/agentos/agentos.pkg.tar.zst
+if [[ -f $package ]]; then
+  pacman -U --noconfirm -- "$package"
+elif ! pacman -Q agentos >/dev/null 2>&1; then
+  exit 1
+fi
+
+/usr/bin/agentos internal-target-install "$1"
+rm -rf -- /opt/agentos

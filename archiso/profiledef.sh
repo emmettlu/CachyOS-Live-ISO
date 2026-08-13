@@ -8,10 +8,7 @@ iso_application="CachyOS Live/Rescue DVD"
 iso_version="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)"
 install_dir="arch"
 buildmodes=('iso')
-## GRUB
-bootmodes=('bios.syslinux' 'uefi.grub')
-## systemd-boot
-#bootmodes=('bios.syslinux' 'uefi.systemd-boot')
+bootmodes=('uefi.systemd-boot')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
@@ -27,6 +24,9 @@ file_permissions=(
   ["/root/.gnupg"]="0:0:700"
   ["/usr/local/bin/choose-mirror"]="0:0:755"
   ["/usr/local/bin/dmcheck"]="0:0:755"
+  ["/usr/local/bin/agentos-configure-calamares"]="0:0:755"
+  ["/usr/local/bin/agentos-install-package"]="0:0:755"
+  ["/usr/local/bin/agentos-prepare-offline-kernels"]="0:0:755"
   ["/usr/local/bin/calamares-online.sh"]="0:0:755"
   ["/usr/local/bin/remove-nvidia"]="0:0:755"
   ["/usr/local/bin/removeun"]="0:0:755"

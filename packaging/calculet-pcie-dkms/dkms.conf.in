@@ -1,0 +1,10 @@
+PACKAGE_NAME="calculet-pci"
+PACKAGE_VERSION="@PKGVER@"
+
+BUILT_MODULE_NAME[0]="calculet_pci"
+BUILT_MODULE_LOCATION[0]="."
+DEST_MODULE_LOCATION[0]="/kernel/drivers/misc"
+
+MAKE[0]="make LLVM=1 -C /usr/lib/modules/${kernelver}/build M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build modules"
+CLEAN="make LLVM=1 -C /usr/lib/modules/${kernelver}/build M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build clean"
+AUTOINSTALL="yes"

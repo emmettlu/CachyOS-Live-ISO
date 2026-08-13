@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: CC0-1.0
+---
+componentName: agentos
+
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+
+windowExpanding: normal
+windowSize: 1100px,520px
+windowPlacement: center
+
+sidebar: qml,bottom
+navigation: widget
+
+strings:
+    productName: AgentOS
+    shortProductName: AgentOS
+    version: rolling
+    shortVersion: rolling
+    versionedName: AgentOS
+    shortVersionedName: AgentOS
+    bootloaderEntryName: AgentOS
+    productUrl: https://github.com/emmettlu/agentos
+    supportUrl: https://github.com/emmettlu/agentos/issues
+    knownIssuesUrl: https://github.com/emmettlu/agentos/issues
+    releaseNotesUrl: https://github.com/emmettlu/agentos/releases
+
+images:
+    productLogo: logo.png
+    productIcon: icon.png
+    productWelcome: welcome.png
+
+style:
+    SidebarBackground: "#292F34"
+    SidebarText: "#FFFFFF"
+    SidebarTextCurrent: "#292F34"
+    SidebarBackgroundCurrent: "#00CED1"
+
+slideshow: [ "welcome.png" ]

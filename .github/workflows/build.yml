@@ -30,6 +30,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Clone AgentOS
+        uses: actions/checkout@v4
+        with:
+          repository: emmettlu/agentos
+          path: agentos-source
+
+      - name: Clone AgentOS Hello
+        uses: actions/checkout@v4
+        with:
+          repository: emmettlu/CachyOS-Welcome
+          ref: develop
+          path: agentos-hello-source
+
       - name: Add CachyOS keyring
         id: keyring
         run: |
@@ -55,6 +68,9 @@ jobs:
         id: build
         run: |
           sudo -H -E -u builder ./buildiso.sh
+        env:
+          AGENTOS_SOURCE_DIR: ${{ github.workspace }}/agentos-source/emmett
+          AGENTOS_HELLO_SOURCE_DIR: ${{ github.workspace }}/agentos-hello-source
 
       - name: Upload ISO to artifacts
         id: upload

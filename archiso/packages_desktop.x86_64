@@ -1,5 +1,7 @@
 alacritty
 alsa-utils
+agentos
+agentos-hello
 amd-ucode
 arch-install-scripts
 archlinux-keyring
@@ -18,7 +20,6 @@ cachy-chroot
 cachyos-calamares-next
 cachyos-cli-installer-new
 cachyos-fish-config
-cachyos-hello
 cachyos-hooks
 cachyos-kde-settings
 cachyos-keyring
@@ -55,7 +56,6 @@ gcc
 gpart
 gparted
 gptfdisk
-grub
 haveged
 hwdetect
 hwinfo
@@ -154,7 +154,6 @@ power-profiles-daemon
 pv
 qemu-guest-agent
 realtime-privileges
-refind
 rp-pppoe
 rsync
 rtkit
@@ -169,7 +168,6 @@ spectacle
 spice-vdagent
 squashfs-tools
 sudo
-syslinux
 systemd-resolvconf
 tcpdump
 testdisk

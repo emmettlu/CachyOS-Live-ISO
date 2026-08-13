@@ -1,0 +1,29 @@
+pkgname=calculet-pcie-dkms
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc='CALCULET KS1 PCIe driver sources for DKMS'
+arch=('x86_64')
+url='https://www.calculet.com'
+license=('GPL-2.0-only')
+depends=(
+  'clang'
+  'dkms'
+  'lld'
+  'llvm'
+)
+provides=('CALCULET-MODULE')
+source=(
+  "calculet-pci-${pkgver}.tar.zst"
+  'dkms.conf'
+)
+sha256sums=('SKIP' 'SKIP')
+
+package() {
+  local source_dir="${srcdir}/calculet-pci-${pkgver}"
+  local install_dir="${pkgdir}/usr/src/calculet-pci-${pkgver}"
+
+  install -d "${install_dir}"
+  cp -a "${source_dir}/." "${install_dir}/"
+  chmod -R u=rwX,go=rX "${install_dir}"
+  install -m 0644 "${srcdir}/dkms.conf" "${install_dir}/dkms.conf"
+}

@@ -1,0 +1,34 @@
+#!/usr/bin/bash
+
+set -euo pipefail
+
+root_prefix=${AGENTOS_OFFLINE_ROOT:-}
+root_prefix=${root_prefix%/}
+
+root_path() {
+    printf '%s%s' "${root_prefix}" "$1"
+}
+
+rm -f -- \
+    "$(root_path /etc/mkinitcpio.conf.d/archiso.conf)" \
+    "$(root_path /etc/mkinitcpio.d/linux.preset)"
+
+found=false
+for kernel in "$(root_path /usr/lib/modules)"/*/vmlinuz; do
+    [[ -f ${kernel} ]] || continue
+    module_dir=${kernel%/vmlinuz}
+    pkgbase_file=${module_dir}/pkgbase
+    [[ -f ${pkgbase_file} ]] || continue
+    IFS= read -r pkgbase <"${pkgbase_file}"
+    if [[ -z ${pkgbase} || ${pkgbase} == */* || ${pkgbase} == .* ]]; then
+        printf 'invalid kernel pkgbase in %s: %s\n' "${pkgbase_file}" "${pkgbase}" >&2
+        exit 1
+    fi
+    install -Dm644 -- "${kernel}" "$(root_path "/boot/vmlinuz-${pkgbase}")"
+    found=true
+done
+
+if [[ ${found} != true ]]; then
+    printf 'no packaged kernels found below /usr/lib/modules\n' >&2
+    exit 1
+fi
