@@ -21,7 +21,7 @@ if [[ -n ${AGENTOS_PACKAGE:-} ]]; then
   package=$(realpath -- "$AGENTOS_PACKAGE")
 else
   "$package_dir/build-package.sh" --nocheck
-  package=$(find "$package_dir" -maxdepth 1 -type f \
+  package=$(find "$package_dir/dist/packages" -maxdepth 1 -type f \
     -name 'agentos-*.pkg.tar.zst' -printf '%T@ %p\n' | sort -nr | sed -n '1s/^[^ ]* //p')
 fi
 [[ -n $package && -f $package ]]
