@@ -168,6 +168,7 @@ spectacle
 spice-vdagent
 squashfs-tools
 sudo
+systemd-boot-manager
 systemd-resolvconf
 tcpdump
 testdisk

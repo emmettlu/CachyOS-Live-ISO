@@ -9,6 +9,38 @@ root_path() {
     printf '%s%s' "${root_prefix}" "$1"
 }
 
+prepare_vconsole() {
+    local config
+    local KEYMAP= KEYMAP_TOGGLE= XKBVARIANT=
+    config=$(root_path /etc/vconsole.conf)
+    if [[ -f ${config} ]]; then
+        # Read the same shell assignments as mkinitcpio's sd-vconsole hook.
+        # shellcheck disable=SC1090
+        source "${config}"
+    fi
+
+    # Calamares can fall back to the XKB name "cn", which kbd does not ship.
+    # The default Chinese XKB layout uses US keys; preserve its XKB settings.
+    if [[ ${KEYMAP} == cn && -z ${XKBVARIANT} ]] && \
+        ! loadkeys --bkeymap --quiet -- cn >/dev/null 2>&1; then
+        loadkeys --bkeymap --quiet -- us >/dev/null
+        sed -i 's/^[[:space:]]*KEYMAP=.*/KEYMAP=us/' "${config}"
+        KEYMAP=us
+        printf 'Using us for the Chinese virtual console keymap\n'
+    fi
+
+    # Compile without opening the live console. Reject other invalid maps
+    # before mkinitcpio can bake an unusable keyboard layout into the image.
+    if [[ ${KEYMAP:-us} != @kernel ]]; then
+        loadkeys --bkeymap --quiet -- "${KEYMAP:-us}" >/dev/null
+    fi
+    if [[ -n ${KEYMAP_TOGGLE} ]]; then
+        loadkeys --bkeymap --quiet -- "${KEYMAP_TOGGLE}" >/dev/null
+    fi
+}
+
+prepare_vconsole
+
 rm -f -- \
     "$(root_path /etc/mkinitcpio.conf.d/archiso.conf)" \
     "$(root_path /etc/mkinitcpio.d/linux.preset)"
