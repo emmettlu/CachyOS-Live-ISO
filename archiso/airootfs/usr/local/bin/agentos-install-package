@@ -2,16 +2,22 @@
 
 set -euo pipefail
 
-if (($# != 1)); then
-  exit 2
-fi
-
-package=/opt/agentos/agentos.pkg.tar.zst
-if [[ -f $package ]]; then
-  pacman -U --noconfirm -- "$package"
-elif ! pacman -Q agentos >/dev/null 2>&1; then
-  exit 1
-fi
-
-/usr/bin/agentos internal-target-install "$1"
-rm -rf -- /opt/agentos
+# Calamares runs this inside the installed target, after creating its user.
+[[ $# == 1 && $EUID == 0 && $1 =~ ^[a-z_][a-z0-9_-]*$ ]] || exit 2
+directory=/opt/agentos
+[[ -d $directory && ! -L $directory ]] || exit 1
+packages=(agentos-utils agentos-runtime calculet-npu-utils calculet-npu-dkms calculet-npu-firmware)
+archives=()
+for name in "${packages[@]}"; do
+    archive=$directory/$name.pkg.tar.zst
+    [[ -f $archive && ! -L $archive ]] || exit 1
+    archives+=("$archive")
+done
+(cd "$directory" && sha256sum --check --strict SHA256SUMS)
+AGENTOS_ENABLE_TRANSACTIONS=1 pacman -U --needed --noconfirm -- "${archives[@]}"
+/usr/bin/agentos-provision "$1"
+# Offline enablement only. Do not start the target's user manager or hardware.
+systemctl --no-reload enable agentos-broker-daemon.service
+systemctl --global --no-reload enable agentos-daemon.service agentos-model-host.service agentrt.service
+rm -- "${archives[@]}" "$directory/SHA256SUMS"
+rmdir -- "$directory"

@@ -1,6 +1,10 @@
 alacritty
 alsa-utils
-agentos
+agentos-utils
+agentos-runtime
+calculet-npu-utils
+calculet-npu-dkms
+calculet-npu-firmware
 agentos-hello
 amd-ucode
 arch-install-scripts

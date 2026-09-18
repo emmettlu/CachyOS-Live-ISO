@@ -63,7 +63,7 @@ ensure_agentos_install_files() {
     local path=$1
     local anchor='  - "/usr/local/bin/remove-nvidia"'
     local installer='  - "/usr/local/bin/agentos-install-package"'
-    local package='  - "/opt/agentos/agentos.pkg.tar.zst"'
+    local package='  - "/opt/agentos/SHA256SUMS"'
     local anchor_count installer_count package_count
 
     anchor_count=$(line_count "${path}" "${anchor}")
@@ -77,10 +77,20 @@ ensure_agentos_install_files() {
     if [[ ${installer_count} -eq 0 && ${package_count} -eq 0 ]]; then
         sed -i '\|^  - "/usr/local/bin/remove-nvidia"$|a\
   - "/usr/local/bin/agentos-install-package"\
-  - "/opt/agentos/agentos.pkg.tar.zst"' "${path}"
+  - "/opt/agentos/SHA256SUMS"\
+  - "/opt/agentos/agentos-utils.pkg.tar.zst"\
+  - "/opt/agentos/agentos-runtime.pkg.tar.zst"\
+  - "/opt/agentos/calculet-npu-utils.pkg.tar.zst"\
+  - "/opt/agentos/calculet-npu-dkms.pkg.tar.zst"\
+  - "/opt/agentos/calculet-npu-firmware.pkg.tar.zst"' "${path}"
     elif [[ ${installer_count} -ne 1 || ${package_count} -ne 1 ]]; then
         fail_state "${path}" "${installer}"
     fi
+    local name
+    for name in agentos-utils agentos-runtime calculet-npu-utils calculet-npu-dkms calculet-npu-firmware; do
+        [[ $(line_count "${path}" "  - \"/opt/agentos/$name.pkg.tar.zst\"") -eq 1 ]] ||
+            fail_state "${path}" "$name package copy declaration"
+    done
 }
 
 ensure_agentos_install_command() {
